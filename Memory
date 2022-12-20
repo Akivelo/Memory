@@ -1,0 +1,226 @@
+from math import *
+import random
+import json
+import time
+
+from tkinter import *
+from tkinter import messagebox
+
+
+def läs_fil():
+    """Läser in fil med alla ord och lägger dem i en lista. Sedan väljs rätt antal ord som
+    behövs för spelet och läggs i en ny lista som sedan fördubblas så att det finns
+    två av varje ord"""
+    valda_ord = []
+    #Kolumn och rad avgör spelplanens storlek. Highscore sparas endast på 4x4
+    kolumn = rad = 4
+    ord = open("memo.txt", "r")
+    ord_lista = list(ord)
+
+    while len(valda_ord) < (kolumn * rad)/2:
+        ord = random.choice(ord_lista)
+        if ord in valda_ord:
+            valda_ord.remove(ord)
+        valda_ord.append(ord)
+    använda_ord = valda_ord + valda_ord
+    random.shuffle(använda_ord)
+    return använda_ord
+
+
+class Highscore:
+    """instansierar highscoreobjektet"""
+
+    def __init__(self, person, score):
+        self.person = person
+        self.score = score
+
+    def __str__(self):
+        """representerar klassen som en sträng"""
+        return f"{self.person} : {self.score}"
+
+
+class GUI():
+    """Klassen skapar guin och skapar samt hanterar alla kort som finns på spelplanen. """
+    def __init__(self):
+        self.window = Tk()
+        self.window.title("MEMORY")
+        self.kolumn = self.rad = sqrt(len(läs_fil()))
+        self.kort_lista = []
+        self.kort_dict = {}
+        self.spelade_ord = []
+        self.rätta_kort = []
+        self.rätta_ord = []
+        self.använda_ord =[]
+        self.poäng = 0
+        self.startsida()
+        self.window.mainloop()
+
+    def startsida(self):
+        self.canvas = Canvas(self.window, height=400, width=312)
+        self.canvas.grid(row=6, column=6)
+        self.rubrik = Label(self.canvas, text="MEMORY", font="Hansson").place(x=100, y=10)
+        self.namn = Label(self.canvas, text="Namn:").place(x=40, y=60)
+        self.huvudtext = Label(self.canvas,
+                               text="Vänligen skriv in ditt namn innan du börjar spela\n för att spara din poäng!")
+        self.huvudtext.place(relx=0.5, rely=0.35, anchor="n")
+
+        # Skapar en ruta för inmatning
+        self.namn_entry = Entry(self.canvas)
+        self.namn_entry.place(x=90, y=60)
+
+        # Nedan skapas de knappar som finns på startsidan
+        Button(self.canvas, text="Avsluta", command=self.canvas.quit).place(x=60, y=100)
+        Button(self.canvas, text="Visa top 5", command=self.visa_highscore).place(x=190, y=100)
+        Button(self.canvas, text="Spela", command=self.spela).place(x=130, y=100)
+
+
+    def visa_highscore(self):
+        """En funktion som aktiveras då knappen 'visa highscore' används. Filen med tidigare highscore öppnas
+        och de 5 bästa highscoren skriv ut för spelaren att se"""
+        try:
+            self.huvudtext["text"] = "Nedan syns top 5 bästa Highscore\nNamn  :  Poäng"
+            self.highscore = json.load(open("Highscore.txt"))
+            self.highscore_sorterad = sorted(self.highscore.items(), key=lambda x: x[1]) #Sorterar efter andra elementet, alltså poängen.
+            self.highscore_dict = dict(self.highscore_sorterad)
+            json.dump(self.highscore_dict, open('Highscore.txt', 'w'))
+
+
+            Label(self.canvas, text=("#1 ", Highscore(list(self.highscore_dict.keys())[0],list(self.highscore_dict.values())[0]))).place(
+                relx=0.5, rely=0.5, anchor="s")
+            Label(self.canvas, text=("#2 ", Highscore(list(self.highscore_dict.keys())[1],list(self.highscore_dict.values())[1]))).place(
+                relx=0.5, rely=0.55, anchor="s")
+            Label(self.canvas, text=("#3 ", Highscore(list(self.highscore_dict.keys())[2],list(self.highscore_dict.values())[2]))).place(
+                relx=0.5, rely=0.6, anchor="s")
+            Label(self.canvas, text=("#4 ", Highscore(list(self.highscore_dict.keys())[3],list(self.highscore_dict.values())[3]))).place(
+                relx=0.5, rely=0.65, anchor="s")
+            Label(self.canvas, text=("#5 ", Highscore(list(self.highscore_dict.keys())[4],list(self.highscore_dict.values())[4]))).place(
+                relx=0.5, rely=0.7, anchor="s")
+        except:
+            Label(self.canvas, text="Behövs fler spelare för att få en komplett top 5 lista").place(relx=0.5, rely=0.7,
+                                                                                               anchor="s")
+
+    def spela(self):
+        """Funktionen kallas på då användaren trycker på knappen 'spela'
+         och kontrollerar om spelaren har ett highscore sedan tidigare. Funktionen förstör alla widgets
+         på canvaset och kallar sedan på funktionen 'fortsätt' och spelet börjar"""
+
+        self.namn = self.namn_entry.get()
+        self.highscore = {}
+        try:
+            self.highscore = json.load(open("Highscore.txt"))
+        except:
+            pass
+
+
+        if self.namn in self.highscore:
+            fråga = messagebox.askyesno("Är det Du?",
+                                        f"Namnet '{self.namn}' finns redan.\nÄr detta du?\nAnnars gå tillbaka och välj annat namn")
+            if fråga:
+                self.skapa_kort()
+            else:
+                self.canvas.destroy()
+                self.startsida()
+        else:
+            self.skapa_kort()
+
+    def förstör(self):
+        """Förstör hela fönstret och allt som finns där i. Hänvisar till en funktion som kallar på klassen på nytt
+        och skapar ett helt nytt fönster"""
+
+        self.canvas.destroy()
+        self.kort_lista.clear()
+        self.kort_dict.clear()
+        self.spelade_ord.clear()
+        self.rätta_kort.clear()
+        self.rätta_ord.clear()
+        self.använda_ord.clear()
+        self.startsida()
+
+    def skapa_kort(self):
+        for widgets in self.canvas.winfo_children():
+            widgets.destroy()
+        """skapar korten som finns på spelplanen
+        och anger ett ord till varje kort"""
+        x = 0
+        y = 0
+        bredd = len(max(läs_fil(), key=len)) + 2 # Gör att kortens storlek ändras beroende på längsta ordet
+        höjd = bredd//2
+
+        for ord in läs_fil():
+            if y != self.kolumn:
+                self.kort = Button(self.canvas, text=ord, height=höjd, width=bredd, activebackground="white", activeforeground="gray")
+                self.kort.grid(row=x, column=y)
+                self.kort["command"] = lambda kort=self.kort: self.vänd_kort(kort)
+                self.kort.config(fg="blue", bg="blue")
+                self.kort_lista.append(self.kort)
+                self.använda_ord.append(ord)
+                y += 1
+                if y == self.kolumn:
+                    y = 0
+                    x += 1
+
+    def skapa_dict(self):
+        """Skapar en dictionary där varje kort är en nyckel till ett specifikt ord"""
+        self.kort_dict = {self.kort_lista[i]: self.använda_ord[i] for i in range(len(self.kort_lista))}
+        return self.kort_dict
+
+
+    def vänd_kort(self,kort):
+        """Funktionen avgör vad som händer när man trycker på ett kort. Är orden på korten samma så förblir dem synliga
+        annars döljs dem igen"""
+        self.skapa_dict()
+
+        if len(self.spelade_ord) < 2:  # kontrollerar nör spelaren valt 2 kort och gör dessa vita
+            kort["bg"] = "white"
+            self.spelade_ord.append(kort["text"])
+            kort["state"] = "disabled"
+
+
+        if len(self.spelade_ord) == 2:  # Kontrollerar ifall de valda korten har samma ord eller inte.
+            self.poäng += 1
+            time.sleep(1)
+            if self.spelade_ord[0] == self.spelade_ord[1]:
+                self.rätta_ord.extend(self.spelade_ord)
+                self.rätta_kort = [kort for kort, value in self.kort_dict.items() if value in self.rätta_ord] #Skapar en lista med rätt nyckel(button) för varje ord i rätta_ord
+
+                for key in self.rätta_kort:
+                    key["state"] = "disabled"
+                    key["bg"] = "white"
+                    self.spelade_ord = []
+
+            else:
+                self.spelade_ord = []
+                for key in self.kort_dict:  # ändrar alla kort som inte är rätta till aktiva och blåa
+                    key["bg"] = "blue"
+                    key["state"] = "normal"
+                for key in self.rätta_kort:
+                    key["bg"] = "white"
+                    key["state"] = "disabled"
+        if len(self.rätta_ord) == self.kolumn*self.rad:
+            messagebox.showinfo("Grattis!", ["Du klarade det. Det tog dig", self.poäng, "försök"])
+            self.uppdatera_highscore()
+
+    def uppdatera_highscore(self):
+        """Uppdaterar highscore listan ifall ditt nya highscore är bättre än ditt gamla"""
+        if self.namn == "" or self.kolumn !=4:
+            self.förstör()
+        else:
+            self.highscore = {}
+            try:
+                self.highscore = json.load(open("Highscore.txt"))
+            except:
+                pass
+            if self.namn in self.highscore and self.highscore[self.namn] < self.poäng:
+                pass
+            else:
+                self.highscore[self.namn] = self.poäng
+            self.highscore_sorterad = sorted(self.highscore.items(), key=lambda x: x[1])
+            self.highscore_dict = dict(self.highscore_sorterad)
+            json.dump(self.highscore_dict, open('Highscore.txt', 'w'))
+            self.poäng = 0
+            index = list(self.highscore_dict.keys()).index(self.namn)
+            messagebox.showinfo("Bra Gjort!", f"Du ligger på plats {index + 1}")
+            self.förstör()
+
+
+gui = GUI()
